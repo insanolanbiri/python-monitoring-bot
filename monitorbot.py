@@ -3,12 +3,14 @@ from datetime import datetime
 from subprocess import Popen, PIPE, STDOUT
 import operator, collections, time, telepot, psutil, os
 
-TOKEN='123456789-ABCDEF' # botfather'dan alınan token
-adminchatid=[123456789] # yönetici şahısların chatid'si
+#TODO: okunan dosyaların yolunu düzgünleştirmem lazım. yaparım bi ara.
+
+TOKEN='1234' # botfather'dan alınan token
+adminchatid=[1234] # yönetici şahısların chatid'si
 memorythreshold=85  # uyarı veriecek bellek yüzdesi
 interval=120  # verilerin yenilenme sıklığı
 
-blacklist = [line.strip() for line in open("/home/erena/Belgeler/monitorbot/blacklist.txt", 'r')]
+blacklist = [line.strip() for line in open("/home/erena/Belgeler/python_bilsem/monitorbot/blacklist.txt", 'r')]
 
 bashid=[]
 uploadid=[]
@@ -53,67 +55,66 @@ class BotClass(telepot.Bot):
         self._message_with_inline_keyboard=None
     def on_chat_message(self, msg):
         content_type, _, chat_id=telepot.glance(msg)
-        if chat_id in adminchatid:
+        isadmin=chat_id in adminchatid
+        try:
             if content_type == 'text':
-                if msg['text'] == "exit" and (chat_id in bashid or chat_id in uploadid):
+                if isadmin and msg['text'] == "exit" and (chat_id in bashid or chat_id in uploadid):
                     clearid(chat_id)
                     bot.sendMessage(chat_id, "tabi.", reply_markup={'hide_keyboard': True})
                 elif chat_id in bashid:
                     bot.sendChatAction(chat_id, 'typing')
-                    p=Popen(msg['text'], shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True)
+                    p=Popen(msg['text'], executable="bash", shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True)
                     output=p.stdout.read()
                     if output != b'':
-                        bot.sendMessage(chat_id, output, disable_web_page_preview=True)
+                        output=output.decode('utf-8')
+                        bot.sendMessage(chat_id, f"```\n{output}\n```", disable_web_page_preview=True,parse_mode= 'Markdown')
                     else:
                         bot.sendMessage(chat_id, "çalıştı ama çıktı vermedi.")
                 elif chat_id in uploadid:
                     bot.sendChatAction(chat_id, 'typing')
-                    try:
-                        bot.sendDocument(chat_id,open(msg['text'],'rb'))
-                    except:
-                        bot.sendMessage(chat_id, "yok ki öyle bişey")
+                    try: bot.sendDocument(chat_id,open(msg['text'],'rb'))
+                    except: bot.sendMessage(chat_id, "yok ki öyle bişey")
                     clearid(chat_id)
-                elif msg['text'] == '/start': bot.sendMessage(chat_id,"merhaba")
-                elif msg['text'] == '/status':
+                elif isadmin and msg['text'] == "/uzayli":
                     bot.sendChatAction(chat_id, 'typing')
-                    bot.sendMessage(chat_id, status(), disable_web_page_preview=True)
-                elif msg['text'] == "/uyudunmu": bot.sendMessage(chat_id, "hayır :)")
-                elif msg['text'] == "/uzayli":
-                    bot.sendChatAction(chat_id, 'typing')
-                    os.popen("play /home/erena/Belgeler/scifi.mp3 > /dev/null 2>&1")
+                    os.popen("play /home/erena/Belgeler/python_bilsem/monitorbot/scifi.mp3 > /dev/null 2>&1")
                     bot.sendMessage(chat_id, "peki")
-                elif msg['text'] == "/ip":
+                elif isadmin and msg['text'] == "/ip":
                     bot.sendChatAction(chat_id, 'typing')
                     os.system("""echo "[`date`] `/home/erena/Belgeler/duckdns.sh`" > /tmp/duckdns.log""")
                     bot.sendMessage(chat_id, "ip adresim bu: "+os.popen("curl ifconfig.me -s").read()+"\n\nayrıca insanolanbiri.duckdns.org'u da güncelledim, onun çıktısı da bu:\n"+os.popen("cat /tmp/duckdns.log").read())
-                elif msg['text'] == "/bash":
-                    bot.sendMessage(chat_id, "çalıştıracağın komutları gönder. canın sıkıldığında `exit` yaz.")
+                elif isadmin and msg['text'] == "/bash":
+                    bot.sendMessage(chat_id, "çalıştıracağın komutları gönder. canın sıkıldığında ```exit``` yaz.",parse_mode= 'Markdown')
                     bashid.append(chat_id)
-                elif msg['text'] == "/upload":
+                elif isadmin and msg['text'] == "/upload":
                     bot.sendMessage(chat_id, "hangi dosyayı göndereyim?")
                     uploadid.append(chat_id)
-                elif "teşekkürler" in msg['text'].lower(): bot.sendMessage(chat_id, "bir şey değil :)")
-                elif msg['text'].lower() == "boşver" or msg['text'].lower() == "boş ver": bot.sendMessage(chat_id, "peki")
-                else: bot.sendMessage(chat_id, "anlamadım?")
-        else:
-            try:
-                if msg['text'] == '/start': bot.sendMessage(chat_id,"merhaba")
+                elif isadmin==False and (msg['text'] in ("/bash", "/upload", "/ip")):
+                    bot.sendMessage(chat_id, "olmaz, sahibim bena tanımadığım kişilerin her dediğini yapmamamı söyledi.")
+                elif isadmin==False and any(kelime in msg['text'].lower() for kelime in blacklist):
+                    bot.sendMessage(chat_id, "bana niye küfrediyosun afasdsfkgjhgklhfkljfdcjcvrht")
+                elif isadmin==False and msg['text'] == "31": bot.sendMessage(chat_id, "çok komik\n\ngülmekten ölüyorum şu an")
+                elif msg['text'] == '/start': 
+                    bot.sendMessage(chat_id,"merhaba")
                 elif msg['text'] == '/status':
                     bot.sendChatAction(chat_id, 'typing')
                     bot.sendMessage(chat_id, status(), disable_web_page_preview=True)
-                elif msg['text'] == "/uyudunmu": bot.sendMessage(chat_id, "hayır :)")
-                elif msg['text'] == "/bash" or msg['text'] == "/upload" or msg['text'] == "/ip": bot.sendMessage(chat_id, "olmaz")
-                elif "teşekkürler" in msg['text'].lower(): bot.sendMessage(chat_id, "bir şey değil :)")
-                elif any(kelime in msg['text'].lower() for kelime in blacklist): bot.sendMessage(chat_id, "bana niye küfrediyosun afasdsfkgjhgklhfkljfdcjcvrht")
-                elif msg['text'] == "31": bot.sendMessage(chat_id, "çok komik\n\ngülmekten ölüyorum şu an")
-                elif msg['text'].lower() == "boşver" or msg['text'].lower() == "boş ver": bot.sendMessage(chat_id, "peki")
+                elif msg['text'] == "/uyudunmu":
+                    bot.sendMessage(chat_id, "hayır :)")
+                elif "teşekkürler" in msg['text'].lower():
+                    bot.sendMessage(chat_id, "bir şey değil :)")
+                elif msg['text'].lower() == "boşver" or msg['text'].lower() == "boş ver":
+                    bot.sendMessage(chat_id, "peki")
                 else: bot.sendMessage(chat_id, "anlamadım?")
-            except:
-                bot.sendMessage(chat_id, "büyük başarısızlıklar sözkonusu")
-            finally:
+            else: bot.sendMessage(chat_id, "ben sadece düz yazıdan anlıyorum")
+        except Exception as e:
+            bot.sendMessage(chat_id, "büyük başarısızlıklar sözkonusu")
+            print(e)
+        finally:
+            if not isadmin:
                 time.sleep(0.5)
                 bot.sendMessage(chat_id, f"ayrıca burada ne işin var {(msg.get('from')).get('first_name').lower()}?")
-                os.popen(f"echo {msg} >> /home/erena/Belgeler/monitorbot/telegram.log")
+                os.popen(f"echo {msg} >> /home/erena/Belgeler/python_bilsem/monitorbot/telegram.log")
 bot=BotClass(TOKEN)
 bot.message_loop()
 t=0
